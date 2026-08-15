@@ -110,7 +110,11 @@ class ProxmoxClient:
     async def list_storage(self) -> list[dict]:
         resp = await self._client.get(f"/nodes/{self.node}/storage")
         resp.raise_for_status()
-        return resp.json()["data"]
+        result = resp.json()["data"]
+        # The list API doesn't guarantee stable ordering between calls;
+        # sort so the UI doesn't reshuffle entities on every poll.
+        result.sort(key=lambda item: item["storage"])
+        return result
 
     async def get_vm_status(self, vmid: int) -> dict:
         resp = await self._client.get(f"/nodes/{self.node}/qemu/{vmid}/status/current")
