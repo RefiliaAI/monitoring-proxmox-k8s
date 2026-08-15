@@ -139,25 +139,30 @@ function renderPods(pods) {
     head.appendChild(renderStatusBadge(podStatusKey(pod), pod.status));
     card.appendChild(head);
 
-    const cpuPct = pod.cpu_limit_millicores && pod.cpu_millicores != null
-      ? (pod.cpu_millicores / pod.cpu_limit_millicores) * 100
-      : null;
+    // Mirror the VM cards: CPU as a percent, RAM as used/limit -- but a
+    // pod can only show either if it has resource limits set, so fall
+    // back to raw usage (with a note) when it doesn't.
+    const hasCpuLimit = pod.cpu_limit_millicores && pod.cpu_millicores != null;
+    const cpuPct = hasCpuLimit ? (pod.cpu_millicores / pod.cpu_limit_millicores) * 100 : null;
     card.appendChild(
       renderMeter({
         label: "CPU",
         pct: cpuPct,
-        valueText: formatMillicores(pod.cpu_millicores),
+        valueText: hasCpuLimit
+          ? `${cpuPct.toFixed(1)}%`
+          : `${formatMillicores(pod.cpu_millicores)} (no limit set)`,
       })
     );
 
-    const memPct = pod.mem_limit_bytes && pod.mem_bytes != null
-      ? (pod.mem_bytes / pod.mem_limit_bytes) * 100
-      : null;
+    const hasMemLimit = pod.mem_limit_bytes && pod.mem_bytes != null;
+    const memPct = hasMemLimit ? (pod.mem_bytes / pod.mem_limit_bytes) * 100 : null;
     card.appendChild(
       renderMeter({
         label: "RAM",
         pct: memPct,
-        valueText: formatBytes(pod.mem_bytes),
+        valueText: hasMemLimit
+          ? `${formatBytes(pod.mem_bytes)} / ${formatBytes(pod.mem_limit_bytes)}`
+          : `${formatBytes(pod.mem_bytes)} (no limit set)`,
       })
     );
 
