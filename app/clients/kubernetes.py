@@ -91,6 +91,9 @@ class K8sClient:
                     "allocatable": n.status.allocatable,
                 }
             )
+        # The list API doesn't guarantee stable ordering between calls;
+        # sort so the UI doesn't reshuffle entities on every poll.
+        result.sort(key=lambda item: item["name"])
         return result
 
     def list_pods(self, namespaces: list[str]) -> list[dict]:
@@ -126,6 +129,9 @@ class K8sClient:
                     ),
                 }
             )
+        # The list API doesn't guarantee stable ordering between calls;
+        # sort so the UI doesn't reshuffle entities on every poll.
+        result.sort(key=lambda item: (item["namespace"], item["display_name"], item["name"]))
         return result
 
     def list_services(self) -> list[dict]:
@@ -140,6 +146,9 @@ class K8sClient:
                     "selector": s.spec.selector or {},
                 }
             )
+        # The list API doesn't guarantee stable ordering between calls;
+        # sort so the UI doesn't reshuffle entities on every poll.
+        result.sort(key=lambda item: (item["namespace"], item["name"]))
         return result
 
     def get_node_metrics(self) -> dict[str, dict]:

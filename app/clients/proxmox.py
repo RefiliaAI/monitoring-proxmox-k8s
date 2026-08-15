@@ -98,7 +98,9 @@ class ProxmoxClient:
         return pick_lan_ip(interfaces, self._reference_host), True
 
     async def fetch_all_vm_stats(self) -> list[dict]:
-        vms = await self.list_vms()
+        # The list API doesn't guarantee stable ordering between calls;
+        # sort so the UI doesn't reshuffle entities on every poll.
+        vms = sorted(await self.list_vms(), key=lambda vm: vm["vmid"])
         results = []
         for vm in vms:
             vmid = vm["vmid"]
