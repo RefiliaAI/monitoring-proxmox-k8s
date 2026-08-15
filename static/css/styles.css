@@ -373,6 +373,14 @@ body {
   stroke-width: 3;
 }
 
+.topo-node-clickable {
+  cursor: pointer;
+}
+
+.topo-node-clickable:hover circle:not(.topo-node-ring) {
+  opacity: 0.8;
+}
+
 /* Table view (accessibility twin of the topology diagram) */
 .table-view {
   width: 100%;

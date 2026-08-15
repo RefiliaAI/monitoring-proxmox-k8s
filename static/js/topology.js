@@ -53,8 +53,62 @@ function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+// Which namespaces are collapsed (their pods/services hidden), persisted
+// across reloads. Keyed by the raw namespace name -- the same value
+// k8s_pod/k8s_service nodes carry in meta.namespace.
+const TOPO_COLLAPSED_STORAGE_KEY = "topology-collapsed-namespaces";
+
+function getCollapsedNamespaces() {
+  try {
+    const raw = localStorage.getItem(TOPO_COLLAPSED_STORAGE_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function setCollapsedNamespaces(set) {
+  try {
+    localStorage.setItem(TOPO_COLLAPSED_STORAGE_KEY, JSON.stringify([...set]));
+  } catch {
+    // localStorage unavailable (private browsing, quota, ...) -- the
+    // toggle still works for this session, it just won't persist.
+  }
+}
+
+// Re-render target for toggling a namespace without waiting for the next
+// poll cycle -- set by renderTopology on every call.
+let lastRenderedTopology = null;
+
+function toggleNamespaceCollapsed(svgEl, namespace) {
+  const collapsed = getCollapsedNamespaces();
+  if (collapsed.has(namespace)) {
+    collapsed.delete(namespace);
+  } else {
+    collapsed.add(namespace);
+  }
+  setCollapsedNamespaces(collapsed);
+  if (lastRenderedTopology) renderTopology(svgEl, lastRenderedTopology);
+}
+
 function renderTopology(svgEl, topology) {
-  const { nodes, edges } = topology;
+  lastRenderedTopology = topology;
+  const collapsed = getCollapsedNamespaces();
+
+  // Count each namespace's children *before* filtering, so a collapsed
+  // namespace can still show "how much is hidden".
+  const namespaceChildCounts = {};
+  for (const n of topology.nodes) {
+    if ((n.type === "k8s_pod" || n.type === "k8s_service") && n.meta && n.meta.namespace) {
+      namespaceChildCounts[n.meta.namespace] = (namespaceChildCounts[n.meta.namespace] || 0) + 1;
+    }
+  }
+
+  const nodes = topology.nodes.filter((n) => {
+    if (n.type !== "k8s_pod" && n.type !== "k8s_service") return true;
+    return !(n.meta && collapsed.has(n.meta.namespace));
+  });
+  const { edges } = topology;
 
   const layers = {};
   for (const node of nodes) {
@@ -113,14 +167,21 @@ function renderTopology(svgEl, topology) {
     const meta = TOPO_TYPE_META[node.type] || TOPO_TYPE_META.vm;
     const fillColor = cssVar(meta.colorVar);
     const ringColor = cssVar(TOPO_STATUS_COLOR_VAR[node.status] || TOPO_STATUS_COLOR_VAR.unknown);
+    const isNamespace = node.type === "namespace";
+    const isNamespaceCollapsed = isNamespace && collapsed.has(node.label);
 
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
     g.setAttribute("transform", `translate(${pos.x}, ${pos.y})`);
+    if (isNamespace) {
+      g.setAttribute("class", "topo-node-clickable");
+      g.addEventListener("click", () => toggleNamespaceCollapsed(svgEl, node.label));
+    }
 
     const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     ring.setAttribute("r", nodeRadius + 4);
     ring.setAttribute("class", "topo-node-ring");
     ring.setAttribute("stroke", ringColor);
+    if (isNamespaceCollapsed) ring.setAttribute("stroke-dasharray", "4 3");
     g.appendChild(ring);
 
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -132,14 +193,18 @@ function renderTopology(svgEl, topology) {
     icon.setAttribute("text-anchor", "middle");
     icon.setAttribute("dominant-baseline", "central");
     icon.setAttribute("font-size", "18");
-    icon.textContent = meta.icon;
+    // Closed vs. open folder doubles as the collapsed/expanded indicator.
+    icon.textContent = isNamespace ? (isNamespaceCollapsed ? "\u{1F4C1}" : "\u{1F4C2}") : meta.icon;
     g.appendChild(icon);
 
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
     label.setAttribute("text-anchor", "middle");
     label.setAttribute("y", nodeRadius + 18);
     label.setAttribute("class", "topo-node-label");
-    label.textContent = truncateLabel(node.label);
+    const hiddenCount = isNamespaceCollapsed ? namespaceChildCounts[node.label] || 0 : 0;
+    label.textContent = hiddenCount
+      ? `${truncateLabel(node.label)} (${hiddenCount} hidden)`
+      : truncateLabel(node.label);
     g.appendChild(label);
 
     if (node.ip) {
@@ -153,7 +218,9 @@ function renderTopology(svgEl, topology) {
 
     const fullName = node.meta && node.meta.full_name;
     const titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
-    titleEl.textContent = `${fullName || node.label} (${meta.label}) — ${node.ip || "no IP"} — ${node.status}`;
+    titleEl.textContent = isNamespace
+      ? `${node.label} (namespace) — click to ${isNamespaceCollapsed ? "expand" : "collapse"}`
+      : `${fullName || node.label} (${meta.label}) — ${node.ip || "no IP"} — ${node.status}`;
     g.appendChild(titleEl);
 
     nodeGroup.appendChild(g);
@@ -175,7 +242,14 @@ function renderTopologyLegend(container) {
 
 function renderTopologyTable(tbody, topology) {
   tbody.innerHTML = "";
+  // Mirror the diagram's collapsed namespaces here too, since this table
+  // is meant to be the same information in an accessible form, not a
+  // separate view.
+  const collapsed = getCollapsedNamespaces();
   for (const node of topology.nodes) {
+    if ((node.type === "k8s_pod" || node.type === "k8s_service") && node.meta && collapsed.has(node.meta.namespace)) {
+      continue;
+    }
     const meta = TOPO_TYPE_META[node.type] || {};
     const tr = document.createElement("tr");
     tr.innerHTML = `
