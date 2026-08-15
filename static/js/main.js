@@ -139,32 +139,37 @@ function renderPods(pods) {
     head.appendChild(renderStatusBadge(podStatusKey(pod), pod.status));
     card.appendChild(head);
 
-    // Mirror the VM cards: CPU as a percent, RAM as used/limit -- but a
-    // pod can only show either if it has resource limits set, so fall
-    // back to raw usage (with a note) when it doesn't.
-    const hasCpuLimit = pod.cpu_limit_millicores && pod.cpu_millicores != null;
-    const cpuPct = hasCpuLimit ? (pod.cpu_millicores / pod.cpu_limit_millicores) * 100 : null;
-    card.appendChild(
-      renderMeter({
-        label: "CPU",
-        pct: cpuPct,
-        valueText: hasCpuLimit
-          ? `${cpuPct.toFixed(1)}%`
-          : `${formatMillicores(pod.cpu_millicores)} (no limit set)`,
-      })
-    );
+    // Mirror the VM cards: CPU as a percent, RAM as used/limit. Whether
+    // that's possible depends on two *independent* things -- don't
+    // conflate them: a limit being configured (static, from the pod
+    // spec) vs. usage data being available yet (metrics-server hasn't
+    // scraped a freshly (re)started pod for ~15-60s, even one with
+    // limits set).
+    const hasCpuLimit = pod.cpu_limit_millicores != null;
+    const hasCpuUsage = pod.cpu_millicores != null;
+    const cpuPct = hasCpuLimit && hasCpuUsage ? (pod.cpu_millicores / pod.cpu_limit_millicores) * 100 : null;
+    let cpuText;
+    if (hasCpuLimit && hasCpuUsage) {
+      cpuText = `${cpuPct.toFixed(1)}%`;
+    } else if (hasCpuUsage) {
+      cpuText = `${formatMillicores(pod.cpu_millicores)} (no limit set)`;
+    } else {
+      cpuText = "Collecting metrics…";
+    }
+    card.appendChild(renderMeter({ label: "CPU", pct: cpuPct, valueText: cpuText }));
 
-    const hasMemLimit = pod.mem_limit_bytes && pod.mem_bytes != null;
-    const memPct = hasMemLimit ? (pod.mem_bytes / pod.mem_limit_bytes) * 100 : null;
-    card.appendChild(
-      renderMeter({
-        label: "RAM",
-        pct: memPct,
-        valueText: hasMemLimit
-          ? `${formatBytes(pod.mem_bytes)} / ${formatBytes(pod.mem_limit_bytes)}`
-          : `${formatBytes(pod.mem_bytes)} (no limit set)`,
-      })
-    );
+    const hasMemLimit = pod.mem_limit_bytes != null;
+    const hasMemUsage = pod.mem_bytes != null;
+    const memPct = hasMemLimit && hasMemUsage ? (pod.mem_bytes / pod.mem_limit_bytes) * 100 : null;
+    let memText;
+    if (hasMemLimit && hasMemUsage) {
+      memText = `${formatBytes(pod.mem_bytes)} / ${formatBytes(pod.mem_limit_bytes)}`;
+    } else if (hasMemUsage) {
+      memText = `${formatBytes(pod.mem_bytes)} (no limit set)`;
+    } else {
+      memText = "Collecting metrics…";
+    }
+    card.appendChild(renderMeter({ label: "RAM", pct: memPct, valueText: memText }));
 
     const metaRow = document.createElement("div");
     metaRow.className = "entity-meta-row";
