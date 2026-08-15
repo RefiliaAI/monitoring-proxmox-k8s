@@ -4,7 +4,7 @@
 monitoring for proxmox and K8s
 
 ## Workflow (required for every change)
-This project uses **GitHub** (remote: (local only — add a GitHub remote later)). Follow this branch-based flow for
+This project uses **GitHub** (remote: https://github.com/RefiliaAI/monitoring-proxmox-k8s). Follow this branch-based flow for
 **every** change — never commit directly to `main`:
 
 1. **Create a branch** for the change and push it to GitHub.
