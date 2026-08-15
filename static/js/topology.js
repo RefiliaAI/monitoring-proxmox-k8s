@@ -4,8 +4,24 @@ const TOPO_LAYER_BY_TYPE = {
   vm: 2,
   k8s_node: 3,
   k8s_pod: 4,
-  k8s_service: 4,
+  k8s_service: 5,
 };
+
+// Layout tuning: each layer wraps its nodes into multiple rows instead of
+// squeezing them all onto one line, so the diagram stays legible as more
+// k3s microservices are added instead of growing overlapping labels.
+const TOPO_CANVAS_WIDTH = 960;
+const TOPO_SLOT_WIDTH = 168;
+const TOPO_ROW_HEIGHT = 96;
+const TOPO_LAYER_GAP = 40;
+const TOPO_TOP_MARGIN = 50;
+const TOPO_BOTTOM_MARGIN = 30;
+const TOPO_MAX_LABEL_CHARS = 16;
+
+function truncateLabel(label) {
+  if (!label || label.length <= TOPO_MAX_LABEL_CHARS) return label;
+  return `${label.slice(0, TOPO_MAX_LABEL_CHARS - 1)}…`;
+}
 
 const TOPO_TYPE_META = {
   gateway: { label: "Gateway / router", colorVar: "--cat-gateway", icon: "\u{1F4E1}" },
@@ -37,20 +53,29 @@ function renderTopology(svgEl, topology) {
   }
   const layerKeys = Object.keys(layers).map(Number).sort((a, b) => a - b);
 
-  const layerHeight = 130;
-  const nodeRadius = 22;
-  const width = Math.max(720, ...layerKeys.map((l) => layers[l].length * 150));
-  const height = (layerKeys.length || 1) * layerHeight + 60;
+  const nodeRadius = 20;
+  const width = TOPO_CANVAS_WIDTH;
+  const columns = Math.max(1, Math.floor(width / TOPO_SLOT_WIDTH));
 
   const positions = new Map();
-  layerKeys.forEach((layerIdx, i) => {
+  let cursorY = TOPO_TOP_MARGIN;
+  for (const layerIdx of layerKeys) {
     const nodesInLayer = layers[layerIdx];
-    const y = 50 + i * layerHeight;
-    const step = width / (nodesInLayer.length + 1);
-    nodesInLayer.forEach((node, j) => {
-      positions.set(node.id, { x: step * (j + 1), y });
+    const rowCount = Math.ceil(nodesInLayer.length / columns);
+    nodesInLayer.forEach((node, i) => {
+      const row = Math.floor(i / columns);
+      const rowStart = row * columns;
+      const itemsInRow = Math.min(columns, nodesInLayer.length - rowStart);
+      const col = i - rowStart;
+      const slotWidth = width / itemsInRow;
+      positions.set(node.id, {
+        x: slotWidth * (col + 0.5),
+        y: cursorY + row * TOPO_ROW_HEIGHT + TOPO_ROW_HEIGHT / 2,
+      });
     });
-  });
+    cursorY += rowCount * TOPO_ROW_HEIGHT + TOPO_LAYER_GAP;
+  }
+  const height = cursorY - TOPO_LAYER_GAP + TOPO_BOTTOM_MARGIN;
 
   svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
   svgEl.innerHTML = "";
@@ -104,7 +129,7 @@ function renderTopology(svgEl, topology) {
     label.setAttribute("text-anchor", "middle");
     label.setAttribute("y", nodeRadius + 18);
     label.setAttribute("class", "topo-node-label");
-    label.textContent = node.label;
+    label.textContent = truncateLabel(node.label);
     g.appendChild(label);
 
     if (node.ip) {
@@ -116,8 +141,9 @@ function renderTopology(svgEl, topology) {
       g.appendChild(sub);
     }
 
+    const fullName = node.meta && node.meta.full_name;
     const titleEl = document.createElementNS("http://www.w3.org/2000/svg", "title");
-    titleEl.textContent = `${node.label} (${meta.label}) — ${node.ip || "no IP"} — ${node.status}`;
+    titleEl.textContent = `${fullName || node.label} (${meta.label}) — ${node.ip || "no IP"} — ${node.status}`;
     g.appendChild(titleEl);
 
     nodeGroup.appendChild(g);

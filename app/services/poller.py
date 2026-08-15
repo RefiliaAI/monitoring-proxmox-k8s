@@ -82,6 +82,7 @@ async def _poll_kubernetes(
                 PodStat(
                     namespace=pod["namespace"],
                     name=pod["name"],
+                    display_name=pod.get("display_name", pod["name"]),
                     node=pod.get("node"),
                     cpu_millicores=metrics.get("cpu_millicores"),
                     mem_bytes=metrics.get("mem_bytes"),

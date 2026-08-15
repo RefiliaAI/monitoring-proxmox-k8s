@@ -132,7 +132,7 @@ function renderPods(pods) {
     head.className = "entity-head";
     head.innerHTML = `
       <div>
-        <div class="entity-name">${pod.name}</div>
+        <div class="entity-name" title="${pod.name}">${pod.display_name}</div>
         <div class="entity-sub">${pod.namespace} · ${pod.node || "unscheduled"}</div>
       </div>
     `;

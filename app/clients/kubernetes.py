@@ -1,9 +1,38 @@
 import logging
+import re
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
 logger = logging.getLogger(__name__)
+
+_TRAILING_HASH_SUFFIX = re.compile(r"-[a-z0-9]+$")
+
+
+def _derive_display_name(pod_name: str, owner_references) -> str:
+    """Strip the ReplicaSet/pod-template hash noise from a pod's generated
+    name (e.g. "e2e-extended-74d6c86cbb-f6q68" -> "e2e-extended") so the UI
+    shows the workload name instead of an opaque hash. Uses the pod's owner
+    reference rather than guessing from the pod name alone, since that's
+    the only reliable signal without an extra Deployment/apps API call:
+
+    - ReplicaSet owner (Deployment-managed pod): the ReplicaSet's own name
+      is "<deployment>-<hash>" -- strip its one trailing hash segment.
+    - DaemonSet/StatefulSet owner: the owner reference name is already the
+      clean workload name (StatefulSet pod names like "myapp-0" are kept
+      as-is since the ordinal is meaningful, not noise).
+    - No owner, or the strip doesn't change anything: fall back to the
+      pod's own name.
+    """
+    if not owner_references:
+        return pod_name
+    owner = owner_references[0]
+    if owner.kind == "ReplicaSet":
+        stripped = _TRAILING_HASH_SUFFIX.sub("", owner.name)
+        return stripped or pod_name
+    if owner.kind in ("DaemonSet", "Job"):
+        return owner.name
+    return pod_name
 
 
 def _parse_cpu_to_millicores(cpu_str: str) -> int:
@@ -82,6 +111,9 @@ class K8sClient:
                 {
                     "namespace": p.metadata.namespace,
                     "name": p.metadata.name,
+                    "display_name": _derive_display_name(
+                        p.metadata.name, p.metadata.owner_references
+                    ),
                     "labels": p.metadata.labels or {},
                     "node": p.spec.node_name,
                     "pod_ip": p.status.pod_ip,

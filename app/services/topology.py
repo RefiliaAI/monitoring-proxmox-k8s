@@ -107,10 +107,10 @@ def build_topology(
             TopologyNode(
                 id=pod_node_id,
                 type="k8s_pod",
-                label=pod["name"],
+                label=pod.get("display_name", pod["name"]),
                 ip=pod.get("pod_ip"),
                 status=status,
-                meta={"namespace": pod["namespace"]},
+                meta={"namespace": pod["namespace"], "full_name": pod["name"]},
             )
         )
         node_name = pod.get("node")

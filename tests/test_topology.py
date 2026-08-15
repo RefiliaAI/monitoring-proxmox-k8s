@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+
+from app.clients.kubernetes import _derive_display_name
 from app.clients.proxmox import pick_lan_ip
 from app.services.topology import build_topology
 
@@ -76,6 +79,53 @@ def test_build_topology_basic_graph():
     # service -> pod edge exists because the selector matches pod labels
     expose_edges = [e for e in topo.edges if e.type == "exposes"]
     assert any(e.source == "svc-default-myapp" and e.target == "pod-default-myapp-abc123" for e in expose_edges)
+
+
+def test_derive_display_name_strips_replicaset_hash():
+    owner = [SimpleNamespace(kind="ReplicaSet", name="e2e-extended-74d6c86cbb")]
+    assert _derive_display_name("e2e-extended-74d6c86cbb-f6q68", owner) == "e2e-extended"
+
+
+def test_derive_display_name_daemonset_uses_owner_name_directly():
+    owner = [SimpleNamespace(kind="DaemonSet", name="fluent-bit")]
+    assert _derive_display_name("fluent-bit-9xzql", owner) == "fluent-bit"
+
+
+def test_derive_display_name_no_owner_keeps_pod_name():
+    assert _derive_display_name("standalone-pod", None) == "standalone-pod"
+    assert _derive_display_name("standalone-pod", []) == "standalone-pod"
+
+
+def test_derive_display_name_statefulset_keeps_ordinal_name():
+    owner = [SimpleNamespace(kind="StatefulSet", name="myapp")]
+    assert _derive_display_name("myapp-0", owner) == "myapp-0"
+
+
+def test_build_topology_pod_label_uses_display_name():
+    pods = [
+        {
+            "namespace": "default",
+            "name": "myapp-74d6c86cbb-f6q68",
+            "display_name": "myapp",
+            "labels": {"app": "myapp"},
+            "node": "debian-k3s",
+            "pod_ip": "10.42.0.5",
+            "status": "Running",
+        }
+    ]
+    topo = build_topology(
+        gateway_ip="192.168.1.1",
+        gateway_label="Home Router",
+        proxmox_host_label="pve",
+        proxmox_host_ip=None,
+        vms=[],
+        k8s_nodes=[],
+        pods=pods,
+        services=[],
+    )
+    pod_node = next(n for n in topo.nodes if n.type == "k8s_pod")
+    assert pod_node.label == "myapp"
+    assert pod_node.meta["full_name"] == "myapp-74d6c86cbb-f6q68"
 
 
 def test_build_topology_service_without_matching_pods_is_skipped():

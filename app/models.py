@@ -30,6 +30,7 @@ class VMStat(BaseModel):
 class PodStat(BaseModel):
     namespace: str
     name: str
+    display_name: str
     node: str | None
     cpu_millicores: int | None
     mem_bytes: int | None
