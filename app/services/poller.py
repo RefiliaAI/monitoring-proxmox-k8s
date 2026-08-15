@@ -8,6 +8,7 @@ from app.clients.kubernetes import K8sClient
 from app.clients.proxmox import ProxmoxClient
 from app.config import settings
 from app.models import ClientDevice, PodStat, ServerStats, VMStat
+from app.services.client_activity import is_recently_active
 from app.services.topology import build_topology
 
 logger = logging.getLogger(__name__)
@@ -100,9 +101,9 @@ async def _poll_kubernetes(
     return pod_stats, k8s_nodes, raw_pods, services
 
 
-async def _poll_clients(fritz: FritzBoxClient | None) -> tuple[list[ClientDevice], list[dict]]:
+async def _poll_clients(fritz: FritzBoxClient | None) -> list[ClientDevice]:
     if fritz is None:
-        return [], []
+        return []
     now = _now()
     try:
         # fritzconnection is a blocking/sync library -- run it off the
@@ -110,26 +111,31 @@ async def _poll_clients(fritz: FritzBoxClient | None) -> tuple[list[ClientDevice
         raw_clients = await asyncio.to_thread(fritz.get_client_devices)
     except Exception:
         logger.exception("FRITZ!Box client discovery failed")
-        return [], []
-    client_stats = [
+        return []
+
+    # The router only reports current on/off state -- carry forward the
+    # last time each device was seen active from the previous cycle so
+    # "seen in the last 24h" is something we can actually answer.
+    prev_last_active = {(c.mac or c.ip): c.last_active_at for c in cache.clients}
+
+    return [
         ClientDevice(
             ip=c["ip"],
             name=c["name"],
             mac=c["mac"],
             active=c["active"],
             interface_type=c["interface_type"],
+            last_active_at=now if c["active"] else prev_last_active.get(c["mac"] or c["ip"]),
             updated_at=now,
         )
         for c in raw_clients
     ]
-    return client_stats, raw_clients
 
 
 async def poll_once(px: ProxmoxClient, k8s: K8sClient, fritz: FritzBoxClient | None = None) -> None:
-    (server, vm_stats, raw_vms), (pod_stats, k8s_nodes, raw_pods, services), (
-        client_stats,
-        raw_clients,
-    ) = await asyncio.gather(_poll_proxmox(px), _poll_kubernetes(k8s), _poll_clients(fritz))
+    (server, vm_stats, raw_vms), (pod_stats, k8s_nodes, raw_pods, services), client_stats = (
+        await asyncio.gather(_poll_proxmox(px), _poll_kubernetes(k8s), _poll_clients(fritz))
+    )
 
     server_stale = server is None
     if server is None and cache.server is not None:
@@ -150,6 +156,15 @@ async def poll_once(px: ProxmoxClient, k8s: K8sClient, fritz: FritzBoxClient | N
         else [c.model_copy(update={"stale": True}) for c in cache.clients]
     )
 
+    # Topology only shows recently-seen clients, matching the default
+    # /api/clients view -- a device unseen for weeks would otherwise
+    # clutter the diagram forever.
+    recent_clients = [
+        c.model_dump()
+        for c in client_stats
+        if is_recently_active(c.active, c.last_active_at, settings.client_recent_hours)
+    ]
+
     topology = None
     try:
         topology = build_topology(
@@ -161,7 +176,7 @@ async def poll_once(px: ProxmoxClient, k8s: K8sClient, fritz: FritzBoxClient | N
             k8s_nodes=k8s_nodes,
             pods=raw_pods,
             services=services,
-            clients=raw_clients,
+            clients=recent_clients,
         )
     except Exception:
         logger.exception("Topology build failed")

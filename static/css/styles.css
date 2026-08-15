@@ -102,6 +102,28 @@ body {
   margin: 0 0 var(--space-3);
 }
 
+.view-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.view-title-row .view-title {
+  margin-bottom: 0;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
 .view[hidden] {
   display: none;
 }

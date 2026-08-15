@@ -48,6 +48,10 @@ class ClientDevice(BaseModel):
     mac: str
     active: bool
     interface_type: str
+    # The router's API only reports current on/off state, not history --
+    # this is tracked by us across poll cycles (see poller.py), so it's
+    # only as complete as how long this pod has been running.
+    last_active_at: str | None = None
     updated_at: str
     stale: bool = False
 

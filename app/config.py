@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     fritzbox_host: str | None = None
     fritzbox_username: str | None = None
     fritzbox_password: str | None = None
+    # Devices not seen online within this window are hidden from the
+    # default client list/topology (still available via ?all=true).
+    client_recent_hours: int = 24
 
     @property
     def fritzbox_enabled(self) -> bool:

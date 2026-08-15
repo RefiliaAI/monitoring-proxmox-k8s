@@ -53,7 +53,13 @@
       </section>
 
       <section id="view-clients" class="view" data-view="clients" hidden>
-        <h2 class="view-title">Devices on the LAN</h2>
+        <div class="view-title-row">
+          <h2 class="view-title">Devices on the LAN</h2>
+          <label class="toggle-row">
+            <input type="checkbox" id="client-show-all" />
+            Show all known devices, not just the last 24h
+          </label>
+        </div>
         <div class="card-grid" id="client-grid">
           <div class="empty-state">Waiting for the first reading&hellip;</div>
         </div>

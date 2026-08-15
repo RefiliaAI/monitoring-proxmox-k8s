@@ -206,7 +206,12 @@ function renderClients(clients) {
         <div class="entity-sub">${device.interface_type || "Unknown interface"}</div>
       </div>
     `;
-    head.appendChild(renderStatusBadge(device.active ? "ok" : "unknown", device.active ? "Online" : "Offline"));
+    head.appendChild(
+      renderStatusBadge(
+        device.active ? "ok" : "unknown",
+        device.active ? "Online" : `Offline · ${formatLastSeen(device.last_active_at)}`
+      )
+    );
     card.appendChild(head);
 
     const metaRow = document.createElement("div");
@@ -216,6 +221,19 @@ function renderClients(clients) {
 
     grid.appendChild(card);
   }
+}
+
+function formatLastSeen(iso) {
+  if (!iso) return "not seen recently";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  if (diffMs < 0) return "just now";
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `seen ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `seen ${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `seen ${days}d ago`;
 }
 
 function renderTopologyView(topology) {
@@ -249,8 +267,17 @@ function setupTabs() {
   });
 }
 
+async function refreshClients() {
+  const showAll = document.getElementById("client-show-all").checked;
+  const clients = await fetchJSON(`/api/clients${showAll ? "?all=true" : ""}`);
+  renderClients(clients);
+}
+
 async function bootstrap() {
   setupTabs();
+  document.getElementById("client-show-all").addEventListener("change", () => {
+    refreshClients().catch((err) => console.error("[clients]", err));
+  });
 
   let refreshIntervalMs = 15000;
   try {
@@ -276,10 +303,7 @@ async function bootstrap() {
         const pods = await fetchJSON("/api/pods");
         renderPods(pods);
       },
-      async () => {
-        const clients = await fetchJSON("/api/clients");
-        renderClients(clients);
-      },
+      refreshClients,
       async () => {
         const topology = await fetchJSON("/api/topology");
         renderTopologyView(topology);

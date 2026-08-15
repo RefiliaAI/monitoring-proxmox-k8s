@@ -28,7 +28,7 @@ class FritzBoxClient:
         except FritzConnectionException:
             logger.exception("FRITZ!Box host list query failed")
             return []
-        return [
+        result = [
             {
                 "ip": h["ip"],
                 "name": h["name"],
@@ -39,3 +39,7 @@ class FritzBoxClient:
             for h in hosts
             if h.get("ip")
         ]
+        # The API doesn't guarantee stable ordering between calls; sort
+        # so the UI doesn't reshuffle entities on every poll.
+        result.sort(key=lambda item: (item["name"], item["ip"]))
+        return result
