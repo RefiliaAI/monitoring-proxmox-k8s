@@ -4,7 +4,7 @@ from app.config import settings
 
 router = APIRouter()
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 
 
 @router.get("/api/meta")
