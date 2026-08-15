@@ -16,4 +16,4 @@ data:
   # Not discoverable via any API -- the one manually-configured seed node.
   LAN_GATEWAY_IP: "192.168.1.1"
   LAN_GATEWAY_LABEL: "Home Router"
-  REFRESH_INTERVAL_SECONDS: "15"
+  REFRESH_INTERVAL_SECONDS: "10"
