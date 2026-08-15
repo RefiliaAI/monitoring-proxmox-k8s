@@ -128,6 +128,66 @@ def test_build_topology_pod_label_uses_display_name():
     assert pod_node.meta["full_name"] == "myapp-74d6c86cbb-f6q68"
 
 
+def test_build_topology_includes_new_client_devices():
+    clients = [
+        {"ip": "192.168.1.77", "name": "johns-iphone", "mac": "AA:BB:CC:DD:EE:FF", "active": True, "interface_type": "802.11"},
+    ]
+    topo = build_topology(
+        gateway_ip="192.168.1.1",
+        gateway_label="Home Router",
+        proxmox_host_label="pve",
+        proxmox_host_ip="192.168.1.10",
+        vms=[],
+        k8s_nodes=[],
+        pods=[],
+        services=[],
+        clients=clients,
+    )
+    client_node = next(n for n in topo.nodes if n.type == "client")
+    assert client_node.id == "client-192-168-1-77"
+    assert client_node.label == "johns-iphone"
+    assert client_node.status == "ok"
+    assert any(e.source == "gateway" and e.target == client_node.id for e in topo.edges)
+
+
+def test_build_topology_deduplicates_clients_already_known():
+    vms = [{"vmid": 100, "name": "debian-k3s", "status": "running", "ip_addresses": ["192.168.1.50"]}]
+    clients = [
+        {"ip": "192.168.1.10", "name": "proxmox-again", "mac": "AA:AA:AA:AA:AA:AA", "active": True, "interface_type": "Ethernet"},
+        {"ip": "192.168.1.50", "name": "vm-again", "mac": "BB:BB:BB:BB:BB:BB", "active": True, "interface_type": "Ethernet"},
+        {"ip": "192.168.1.99", "name": "actually-new", "mac": "CC:CC:CC:CC:CC:CC", "active": False, "interface_type": "802.11"},
+    ]
+    topo = build_topology(
+        gateway_ip="192.168.1.1",
+        gateway_label="Home Router",
+        proxmox_host_label="pve",
+        proxmox_host_ip="192.168.1.10",
+        vms=vms,
+        k8s_nodes=[],
+        pods=[],
+        services=[],
+        clients=clients,
+    )
+    client_nodes = [n for n in topo.nodes if n.type == "client"]
+    assert len(client_nodes) == 1
+    assert client_nodes[0].label == "actually-new"
+    assert client_nodes[0].status == "unknown"  # inactive device
+
+
+def test_build_topology_no_clients_arg_is_fine():
+    topo = build_topology(
+        gateway_ip="192.168.1.1",
+        gateway_label="Home Router",
+        proxmox_host_label="pve",
+        proxmox_host_ip=None,
+        vms=[],
+        k8s_nodes=[],
+        pods=[],
+        services=[],
+    )
+    assert not any(n.type == "client" for n in topo.nodes)
+
+
 def test_build_topology_service_without_matching_pods_is_skipped():
     topo = build_topology(
         gateway_ip="192.168.1.1",

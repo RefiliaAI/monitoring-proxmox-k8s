@@ -12,4 +12,5 @@ async def get_meta():
     return {
         "refresh_interval_seconds": settings.refresh_interval_seconds,
         "version": APP_VERSION,
+        "client_discovery_enabled": settings.fritzbox_enabled,
     }

@@ -5,10 +5,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.clients.fritzbox import FritzBoxClient
 from app.clients.kubernetes import K8sClient
 from app.clients.proxmox import ProxmoxClient
 from app.config import settings
-from app.routers import health, meta, pods, server, topology, vms
+from app.routers import clients, health, meta, pods, server, topology, vms
 from app.services.poller import poller_loop
 
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +27,19 @@ async def lifespan(app: FastAPI):
     )
     k8s = K8sClient(in_cluster=settings.k8s_in_cluster)
 
-    task = asyncio.create_task(poller_loop(px, k8s))
+    fritz: FritzBoxClient | None = None
+    if settings.fritzbox_enabled:
+        try:
+            fritz = await asyncio.to_thread(
+                FritzBoxClient,
+                host=settings.fritzbox_host or settings.lan_gateway_ip,
+                username=settings.fritzbox_username,
+                password=settings.fritzbox_password,
+            )
+        except Exception:
+            logger.exception("FRITZ!Box connection failed -- client discovery disabled")
+
+    task = asyncio.create_task(poller_loop(px, k8s, fritz))
     try:
         yield
     finally:
@@ -44,6 +57,7 @@ app.include_router(health.router)
 app.include_router(server.router)
 app.include_router(vms.router)
 app.include_router(pods.router)
+app.include_router(clients.router)
 app.include_router(topology.router)
 app.include_router(meta.router)
 

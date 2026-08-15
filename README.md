@@ -7,7 +7,10 @@ Shows:
 - Overall physical server CPU/RAM totals vs. current utilization.
 - Per-VM CPU/RAM (with LAN IPs, via the QEMU guest agent).
 - Per-microservice (k3s pod) CPU/RAM.
-- An auto-discovered network plan: gateway → Proxmox host → VMs → k3s node → pods/services.
+- Every other device on the LAN (phones, laptops, IoT, ...), if a FRITZ!Box router is
+  configured -- name, IP, MAC, online/offline.
+- An auto-discovered network plan: gateway → Proxmox host → VMs → k3s node →
+  pods/services, plus any LAN devices above.
 
 ## Architecture
 
@@ -36,6 +39,12 @@ Before deploying, you'll need:
    `WATCHED_NAMESPACES`, `LAN_GATEWAY_IP`, `LAN_GATEWAY_LABEL`).
 5. Copy `deploy/k8s/secret.example.yaml` to `deploy/k8s/secret.yaml`, fill in the real
    Proxmox token, and **do not commit it** (already gitignored).
+6. *(Optional)* LAN device discovery, if your router is a FRITZ!Box: create a dedicated
+   FRITZ!Box user (Home Network → Network → Network Settings → FRITZ!Box Users, or
+   System → FRITZ!Box Users) rather than reusing your admin login, and set
+   `FRITZBOX_USERNAME` / `FRITZBOX_PASSWORD` in `secret.yaml`. Uses `LAN_GATEWAY_IP` as
+   the router address unless `FRITZBOX_HOST` is set separately. Leave both blank to skip
+   this entirely -- the dashboard works the same without it.
 
 ## Build & deploy (on/for the Debian k3s VM)
 

@@ -3,10 +3,11 @@ import logging
 from datetime import datetime, timezone
 
 from app.cache import cache
+from app.clients.fritzbox import FritzBoxClient
 from app.clients.kubernetes import K8sClient
 from app.clients.proxmox import ProxmoxClient
 from app.config import settings
-from app.models import PodStat, ServerStats, VMStat
+from app.models import ClientDevice, PodStat, ServerStats, VMStat
 from app.services.topology import build_topology
 
 logger = logging.getLogger(__name__)
@@ -99,10 +100,36 @@ async def _poll_kubernetes(
     return pod_stats, k8s_nodes, raw_pods, services
 
 
-async def poll_once(px: ProxmoxClient, k8s: K8sClient) -> None:
-    (server, vm_stats, raw_vms), (pod_stats, k8s_nodes, raw_pods, services) = await asyncio.gather(
-        _poll_proxmox(px), _poll_kubernetes(k8s)
-    )
+async def _poll_clients(fritz: FritzBoxClient | None) -> tuple[list[ClientDevice], list[dict]]:
+    if fritz is None:
+        return [], []
+    now = _now()
+    try:
+        # fritzconnection is a blocking/sync library -- run it off the
+        # event loop so a slow router response doesn't stall API requests.
+        raw_clients = await asyncio.to_thread(fritz.get_client_devices)
+    except Exception:
+        logger.exception("FRITZ!Box client discovery failed")
+        return [], []
+    client_stats = [
+        ClientDevice(
+            ip=c["ip"],
+            name=c["name"],
+            mac=c["mac"],
+            active=c["active"],
+            interface_type=c["interface_type"],
+            updated_at=now,
+        )
+        for c in raw_clients
+    ]
+    return client_stats, raw_clients
+
+
+async def poll_once(px: ProxmoxClient, k8s: K8sClient, fritz: FritzBoxClient | None = None) -> None:
+    (server, vm_stats, raw_vms), (pod_stats, k8s_nodes, raw_pods, services), (
+        client_stats,
+        raw_clients,
+    ) = await asyncio.gather(_poll_proxmox(px), _poll_kubernetes(k8s), _poll_clients(fritz))
 
     server_stale = server is None
     if server is None and cache.server is not None:
@@ -113,6 +140,15 @@ async def poll_once(px: ProxmoxClient, k8s: K8sClient) -> None:
 
     pods_stale = not pod_stats
     pods = pod_stats if pod_stats else [p.model_copy(update={"stale": True}) for p in cache.pods]
+
+    # Only fall back to a stale cache when discovery is actually enabled --
+    # an empty list from a disabled feature is correct, not stale.
+    clients_stale = settings.fritzbox_enabled and not client_stats
+    clients = (
+        client_stats
+        if client_stats or not settings.fritzbox_enabled
+        else [c.model_copy(update={"stale": True}) for c in cache.clients]
+    )
 
     topology = None
     try:
@@ -125,25 +161,27 @@ async def poll_once(px: ProxmoxClient, k8s: K8sClient) -> None:
             k8s_nodes=k8s_nodes,
             pods=raw_pods,
             services=services,
+            clients=raw_clients,
         )
     except Exception:
         logger.exception("Topology build failed")
 
-    await cache.update(server=server, vms=vms, pods=pods, topology=topology)
+    await cache.update(server=server, vms=vms, pods=pods, clients=clients, topology=topology)
 
-    if server_stale or vms_stale or pods_stale:
+    if server_stale or vms_stale or pods_stale or clients_stale:
         logger.warning(
-            "Partial poll cycle: server_stale=%s vms_stale=%s pods_stale=%s",
+            "Partial poll cycle: server_stale=%s vms_stale=%s pods_stale=%s clients_stale=%s",
             server_stale,
             vms_stale,
             pods_stale,
+            clients_stale,
         )
 
 
-async def poller_loop(px: ProxmoxClient, k8s: K8sClient) -> None:
+async def poller_loop(px: ProxmoxClient, k8s: K8sClient, fritz: FritzBoxClient | None = None) -> None:
     while True:
         try:
-            await poll_once(px, k8s)
+            await poll_once(px, k8s, fritz)
         except Exception:
             logger.exception("Unhandled poll cycle error")
         await asyncio.sleep(settings.refresh_interval_seconds)

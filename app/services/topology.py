@@ -13,6 +13,7 @@ def build_topology(
     k8s_nodes: list[dict],
     pods: list[dict],
     services: list[dict],
+    clients: list[dict] | None = None,
 ) -> Topology:
     """Compose the unified topology graph. Every node/edge lands in the
     same two flat lists regardless of whether it came from Proxmox,
@@ -46,6 +47,10 @@ def build_topology(
     )
     edges.append(TopologyEdge(source=gateway_id, target=host_id, type="network"))
 
+    known_ips = {gateway_ip}
+    if proxmox_host_ip:
+        known_ips.add(proxmox_host_ip)
+
     vm_id_by_vmid: dict[int, str] = {}
     for vm in vms:
         vmid = vm["vmid"]
@@ -67,6 +72,27 @@ def build_topology(
         edges.append(TopologyEdge(source=host_id, target=node_id, type="hosts"))
         if primary_ip:
             edges.append(TopologyEdge(source=gateway_id, target=node_id, type="network"))
+        known_ips.update(ip_addresses)
+
+    # Generic LAN clients (phones, laptops, IoT, ...) from the router's
+    # host list, excluding anything already represented by a more
+    # specific node above (Proxmox host, VMs) so it isn't shown twice.
+    for dev in clients or []:
+        ip = dev.get("ip")
+        if not ip or ip in known_ips:
+            continue
+        client_id = f"client-{ip.replace('.', '-')}"
+        nodes.append(
+            TopologyNode(
+                id=client_id,
+                type="client",
+                label=dev.get("name") or ip,
+                ip=ip,
+                status="ok" if dev.get("active") else "unknown",
+                meta={"mac": dev.get("mac"), "interface_type": dev.get("interface_type")},
+            )
+        )
+        edges.append(TopologyEdge(source=gateway_id, target=client_id, type="network"))
 
     # Match each k8s Node to the VM that reports the same InternalIP among
     # its guest-agent-discovered addresses (heuristic -- keeps working if

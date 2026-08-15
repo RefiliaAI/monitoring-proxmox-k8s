@@ -42,10 +42,20 @@ class PodStat(BaseModel):
     stale: bool = False
 
 
+class ClientDevice(BaseModel):
+    ip: str
+    name: str
+    mac: str
+    active: bool
+    interface_type: str
+    updated_at: str
+    stale: bool = False
+
+
 class TopologyNode(BaseModel):
     id: str
     type: Literal[
-        "gateway", "proxmox_host", "vm", "k8s_node", "k8s_pod", "k8s_service"
+        "gateway", "proxmox_host", "vm", "k8s_node", "k8s_pod", "k8s_service", "client"
     ]
     label: str
     ip: str | None = None

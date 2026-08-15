@@ -180,6 +180,44 @@ function renderPods(pods) {
   }
 }
 
+let clientDiscoveryEnabled = true;
+
+function renderClients(clients) {
+  const grid = document.getElementById("client-grid");
+  grid.innerHTML = "";
+  if (!clientDiscoveryEnabled) {
+    grid.innerHTML =
+      '<div class="empty-state">LAN device discovery isn’t configured (needs FRITZ!Box router credentials).</div>';
+    return;
+  }
+  if (!clients.length) {
+    grid.innerHTML = '<div class="empty-state">No devices reported yet.</div>';
+    return;
+  }
+  for (const device of clients) {
+    const card = document.createElement("div");
+    card.className = "card entity-card";
+
+    const head = document.createElement("div");
+    head.className = "entity-head";
+    head.innerHTML = `
+      <div>
+        <div class="entity-name">${device.name || device.ip}</div>
+        <div class="entity-sub">${device.interface_type || "Unknown interface"}</div>
+      </div>
+    `;
+    head.appendChild(renderStatusBadge(device.active ? "ok" : "unknown", device.active ? "Online" : "Offline"));
+    card.appendChild(head);
+
+    const metaRow = document.createElement("div");
+    metaRow.className = "entity-meta-row";
+    metaRow.innerHTML = `<code>${device.ip}</code><code>${device.mac}</code>`;
+    card.appendChild(metaRow);
+
+    grid.appendChild(card);
+  }
+}
+
 function renderTopologyView(topology) {
   const svg = document.getElementById("topology-svg");
   renderTopology(svg, topology);
@@ -218,6 +256,7 @@ async function bootstrap() {
   try {
     const meta = await fetchJSON("/api/meta");
     refreshIntervalMs = Math.max(5, meta.refresh_interval_seconds) * 1000;
+    clientDiscoveryEnabled = Boolean(meta.client_discovery_enabled);
   } catch (err) {
     console.error("[meta]", err);
   }
@@ -236,6 +275,10 @@ async function bootstrap() {
       async () => {
         const pods = await fetchJSON("/api/pods");
         renderPods(pods);
+      },
+      async () => {
+        const clients = await fetchJSON("/api/clients");
+        renderClients(clients);
       },
       async () => {
         const topology = await fetchJSON("/api/topology");

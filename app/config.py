@@ -19,6 +19,16 @@ class Settings(BaseSettings):
     lan_gateway_ip: str
     lan_gateway_label: str = "Home Router"
 
+    # FRITZ!Box (optional) -- lists every LAN client via the router's
+    # TR-064 API. Client discovery is simply skipped if unset.
+    fritzbox_host: str | None = None
+    fritzbox_username: str | None = None
+    fritzbox_password: str | None = None
+
+    @property
+    def fritzbox_enabled(self) -> bool:
+        return bool(self.fritzbox_username and self.fritzbox_password)
+
     # Poller
     refresh_interval_seconds: int = 15
 

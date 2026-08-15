@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field
 
-from app.models import PodStat, ServerStats, Topology, VMStat
+from app.models import ClientDevice, PodStat, ServerStats, Topology, VMStat
 
 
 @dataclass
@@ -9,6 +9,7 @@ class SnapshotCache:
     server: ServerStats | None = None
     vms: list[VMStat] = field(default_factory=list)
     pods: list[PodStat] = field(default_factory=list)
+    clients: list[ClientDevice] = field(default_factory=list)
     topology: Topology | None = None
     ready: bool = False
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -18,6 +19,7 @@ class SnapshotCache:
         server: ServerStats | None,
         vms: list[VMStat] | None,
         pods: list[PodStat] | None,
+        clients: list[ClientDevice] | None,
         topology: Topology | None,
     ) -> None:
         async with self._lock:
@@ -27,6 +29,8 @@ class SnapshotCache:
                 self.vms = vms
             if pods is not None:
                 self.pods = pods
+            if clients is not None:
+                self.clients = clients
             if topology is not None:
                 self.topology = topology
             self.ready = True

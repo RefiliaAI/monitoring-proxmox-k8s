@@ -51,6 +51,7 @@
   --cat-vm: #1baf7a;         /* slot 3 aqua */
   --cat-k8s-node: #eda100;   /* slot 4 yellow */
   --cat-k8s-pod: #e87ba4;    /* slot 5 magenta */
+  --cat-client: #008300;     /* slot 6 green */
   --cat-k8s-service: #4a3aa7;/* slot 7 violet */
 
   --radius-sm: 10px;

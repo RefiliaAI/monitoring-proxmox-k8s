@@ -1,6 +1,7 @@
 const TOPO_LAYER_BY_TYPE = {
   gateway: 0,
   proxmox_host: 1,
+  client: 1,
   vm: 2,
   k8s_node: 3,
   k8s_pod: 4,
@@ -26,6 +27,7 @@ function truncateLabel(label) {
 const TOPO_TYPE_META = {
   gateway: { label: "Gateway / router", colorVar: "--cat-gateway", icon: "\u{1F4E1}" },
   proxmox_host: { label: "Proxmox host", colorVar: "--cat-proxmox", icon: "\u{1F5A5}" },
+  client: { label: "LAN device", colorVar: "--cat-client", icon: "\u{1F4F1}" },
   vm: { label: "Virtual machine", colorVar: "--cat-vm", icon: "\u{1F4BB}" },
   k8s_node: { label: "k3s node", colorVar: "--cat-k8s-node", icon: "☸" },
   k8s_pod: { label: "Microservice (pod)", colorVar: "--cat-k8s-pod", icon: "\u{1F4E6}" },
