@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-dashboard-config
+  namespace: monitoring
+data:
+  # Proxmox host URL and node name -- fill in for your environment.
+  PROXMOX_HOST: "https://192.168.1.10:8006"
+  PROXMOX_NODE: "pve"
+  # Self-signed Proxmox cert on a LAN-only, read-only token connection.
+  PROXMOX_VERIFY_SSL: "false"
+  # Namespace(s) whose pods count as "microservices" in the dashboard.
+  WATCHED_NAMESPACES: "default"
+  # Not discoverable via any API -- the one manually-configured seed node.
+  LAN_GATEWAY_IP: "192.168.1.1"
+  LAN_GATEWAY_LABEL: "Home Router"
+  REFRESH_INTERVAL_SECONDS: "15"

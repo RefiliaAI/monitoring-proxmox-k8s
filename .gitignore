@@ -6,3 +6,13 @@ out/
 *.log
 .DS_Store
 .assets/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Real k8s secret (only secret.example.yaml is committed)
+deploy/k8s/secret.yaml

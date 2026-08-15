@@ -1,0 +1,10 @@
+.git
+__pycache__/
+*.pyc
+.venv/
+venv/
+deploy/k8s/secret.yaml
+tests/
+.env
+.env.local
+*.md

@@ -1,0 +1,15 @@
+from fastapi import APIRouter
+
+from app.config import settings
+
+router = APIRouter()
+
+APP_VERSION = "0.1.0"
+
+
+@router.get("/api/meta")
+async def get_meta():
+    return {
+        "refresh_interval_seconds": settings.refresh_interval_seconds,
+        "version": APP_VERSION,
+    }

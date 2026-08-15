@@ -1,0 +1,116 @@
+/* Design tokens: cute pastel pink & white theme.
+   Chrome (surfaces/text/accent) carries the brand look; the sequential
+   meter ramp, status colors, and topology categorical colors are chosen
+   per the dataviz color-formula checks, not eyeballed. */
+
+:root {
+  color-scheme: light;
+
+  /* Chrome surfaces */
+  --surface-page: #fff7fa;
+  --surface-card: #ffffff;
+  --surface-card-alt: #fff0f6;
+  --border-color: #f6d9e6;
+  --shadow-color: rgba(230, 120, 170, 0.18);
+
+  /* Brand accent (decorative — headers, tabs, buttons; not a data-encoding color) */
+  --accent: #ea6a9e;
+  --accent-strong: #cc195b;
+  --accent-soft: #fce8f0;
+
+  /* Text */
+  --text-primary: #3a1f2b;
+  --text-secondary: #7a5266;
+  --text-muted: #a9899a;
+
+  /* Sequential ramp (magnitude — CPU/RAM meter fill), single hue, light->dark */
+  --seq-100: #fce8f0;
+  --seq-150: #fad6e3;
+  --seq-200: #f8c4d7;
+  --seq-250: #f5adc8;
+  --seq-300: #f292b5;
+  --seq-350: #ee72a0;
+  --seq-400: #e94e87;
+  --seq-450: #e52a6e;
+  --seq-500: #cc195b;
+  --seq-550: #ac154d;
+  --seq-600: #8d113f;
+  --seq-650: #710e32;
+  --seq-700: #560b26;
+
+  /* Status palette — fixed/reserved, never themed */
+  --status-ok: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --status-unknown: #898781;
+
+  /* Topology categorical (identity of node type), documented order subset */
+  --cat-gateway: #2a78d6;    /* slot 1 blue */
+  --cat-proxmox: #eb6834;    /* slot 2 orange */
+  --cat-vm: #1baf7a;         /* slot 3 aqua */
+  --cat-k8s-node: #eda100;   /* slot 4 yellow */
+  --cat-k8s-pod: #e87ba4;    /* slot 5 magenta */
+  --cat-k8s-service: #4a3aa7;/* slot 7 violet */
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+
+    --surface-page: #201019;
+    --surface-card: #33172a;
+    --surface-card-alt: #3d1c32;
+    --border-color: #522c40;
+    --shadow-color: rgba(0, 0, 0, 0.4);
+
+    --accent: #ee7dab;
+    --accent-strong: #ff5c95;
+    --accent-soft: #4a2138;
+
+    --text-primary: #fdf1f5;
+    --text-secondary: #dcb7c9;
+    --text-muted: #a48193;
+
+    --cat-gateway: #3987e5;
+    --cat-proxmox: #d95926;
+    --cat-vm: #199e70;
+    --cat-k8s-node: #c98500;
+    --cat-k8s-pod: #d55181;
+    --cat-k8s-service: #9085e9;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-page: #201019;
+  --surface-card: #33172a;
+  --surface-card-alt: #3d1c32;
+  --border-color: #522c40;
+  --shadow-color: rgba(0, 0, 0, 0.4);
+
+  --accent: #ee7dab;
+  --accent-strong: #ff5c95;
+  --accent-soft: #4a2138;
+
+  --text-primary: #fdf1f5;
+  --text-secondary: #dcb7c9;
+  --text-muted: #a48193;
+
+  --cat-gateway: #3987e5;
+  --cat-proxmox: #d95926;
+  --cat-vm: #199e70;
+  --cat-k8s-node: #c98500;
+  --cat-k8s-pod: #d55181;
+  --cat-k8s-service: #9085e9;
+}

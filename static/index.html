@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Server Dashboard</title>
+  <link rel="stylesheet" href="/css/tokens.css" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">&#9829;</span>
+        <div>
+          <h1>Server Dashboard</h1>
+          <p class="subtitle">Proxmox &amp; k3s, at a glance</p>
+        </div>
+      </div>
+      <div class="header-meta">
+        <span class="pill" id="last-updated">Loading&hellip;</span>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Dashboard views">
+      <button class="tab" role="tab" aria-selected="true" data-view="overview">Overview</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="vms">Virtual Machines</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="pods">Microservices</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="topology">Network Plan</button>
+    </nav>
+
+    <main class="view-container">
+      <section id="view-overview" class="view" data-view="overview">
+        <h2 class="view-title">Overall server utilization</h2>
+        <div class="hero-grid" id="overview-hero">
+          <div class="empty-state">Waiting for the first reading&hellip;</div>
+        </div>
+      </section>
+
+      <section id="view-vms" class="view" data-view="vms" hidden>
+        <h2 class="view-title">Virtual machines</h2>
+        <div class="card-grid" id="vm-grid">
+          <div class="empty-state">Waiting for the first reading&hellip;</div>
+        </div>
+      </section>
+
+      <section id="view-pods" class="view" data-view="pods" hidden>
+        <h2 class="view-title">Microservices (k3s pods)</h2>
+        <div class="card-grid" id="pod-grid">
+          <div class="empty-state">Waiting for the first reading&hellip;</div>
+        </div>
+      </section>
+
+      <section id="view-topology" class="view" data-view="topology" hidden>
+        <h2 class="view-title">Network plan</h2>
+        <div class="topology-card">
+          <div class="topology-legend" id="topology-legend"></div>
+          <div class="topology-canvas-wrap">
+            <svg id="topology-svg" class="topology-svg" role="img" aria-label="Network topology diagram"></svg>
+          </div>
+        </div>
+        <table class="table-view" id="topology-table" aria-label="Network plan, table view">
+          <caption>Table view of the network plan</caption>
+          <thead>
+            <tr><th>Name</th><th>Type</th><th>IP address</th><th>Status</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <span id="footer-note">monitoring-proxmox-k8s</span>
+    </footer>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/meters.js"></script>
+  <script src="/js/topology.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>
