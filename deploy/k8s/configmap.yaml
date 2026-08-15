@@ -10,7 +10,9 @@ data:
   # Self-signed Proxmox cert on a LAN-only, read-only token connection.
   PROXMOX_VERIFY_SSL: "false"
   # Namespace(s) whose pods count as "microservices" in the dashboard.
-  WATCHED_NAMESPACES: "e2e-extended"
+  # Includes "monitoring" so the dashboard's own pod shows up too --
+  # it's a real workload consuming real CPU/RAM like any other.
+  WATCHED_NAMESPACES: "e2e-extended,monitoring"
   # Not discoverable via any API -- the one manually-configured seed node.
   LAN_GATEWAY_IP: "192.168.1.1"
   LAN_GATEWAY_LABEL: "Home Router"
