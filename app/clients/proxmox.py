@@ -56,6 +56,7 @@ class ProxmoxClient:
     def __init__(self, host: str, node: str, token_id: str, token_secret: str, verify_ssl: bool = False):
         self.node = node
         self._reference_host = httpx.URL(host).host
+        self.host = self._reference_host
         self._client = httpx.AsyncClient(
             base_url=f"{host.rstrip('/')}/api2/json",
             headers={"Authorization": f"PVEAPIToken={token_id}={token_secret}"},

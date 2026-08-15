@@ -119,7 +119,7 @@ async def poll_once(px: ProxmoxClient, k8s: K8sClient) -> None:
             gateway_ip=settings.lan_gateway_ip,
             gateway_label=settings.lan_gateway_label,
             proxmox_host_label=px.node,
-            proxmox_host_ip=None,
+            proxmox_host_ip=px.host,
             vms=raw_vms,
             k8s_nodes=k8s_nodes,
             pods=raw_pods,
