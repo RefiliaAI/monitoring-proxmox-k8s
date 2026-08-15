@@ -36,8 +36,10 @@ Before deploying, you'll need:
    dashboard discover each VM's real LAN IP.
 3. **LAN gateway IP** — your router's IP, used as the one manually-seeded node in the
    network plan (everything else is auto-discovered).
-4. Fill in `deploy/k8s/configmap.yaml` (`PROXMOX_HOST`, `PROXMOX_NODE`,
-   `WATCHED_NAMESPACES`, `LAN_GATEWAY_IP`, `LAN_GATEWAY_LABEL`).
+4. Copy `deploy/k8s/configmap.example.yaml` to `deploy/k8s/configmap.yaml`, fill in
+   your real `PROXMOX_HOST`, `PROXMOX_NODE`, `WATCHED_NAMESPACES`, `LAN_GATEWAY_IP`,
+   `LAN_GATEWAY_LABEL`, and **do not commit it** (already gitignored -- it holds real
+   internal IPs that don't belong in a, potentially public, repo).
 5. Copy `deploy/k8s/secret.example.yaml` to `deploy/k8s/secret.yaml`, fill in the real
    Proxmox token, and **do not commit it** (already gitignored).
 6. *(Optional)* LAN device discovery, if your router is a FRITZ!Box: create a dedicated

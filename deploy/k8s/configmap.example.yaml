@@ -1,0 +1,27 @@
+# Template only -- copy this to configmap.yaml, fill in your real values,
+# and apply it separately. configmap.yaml is gitignored and must never be
+# committed: it holds real internal IPs (Proxmox host, LAN gateway) that
+# don't belong in a (potentially public) repo.
+#
+#   cp configmap.example.yaml configmap.yaml
+#   # edit configmap.yaml with your real values
+#   kubectl apply -f configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-dashboard-config
+  namespace: monitoring
+data:
+  # Proxmox host URL and node name.
+  PROXMOX_HOST: "https://192.168.1.10:8006"
+  PROXMOX_NODE: "pve"
+  # Self-signed Proxmox cert on a LAN-only, read-only token connection.
+  PROXMOX_VERIFY_SSL: "false"
+  # Namespace(s) whose pods count as "microservices" in the dashboard.
+  # Include "monitoring" so the dashboard's own pod shows up too -- it's
+  # a real workload consuming real CPU/RAM like any other.
+  WATCHED_NAMESPACES: "default,monitoring"
+  # Not discoverable via any API -- the one manually-configured seed node.
+  LAN_GATEWAY_IP: "192.168.1.1"
+  LAN_GATEWAY_LABEL: "Home Router"
+  REFRESH_INTERVAL_SECONDS: "10"

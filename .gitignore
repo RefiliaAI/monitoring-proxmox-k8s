@@ -14,5 +14,8 @@ __pycache__/
 venv/
 *.egg-info/
 
-# Real k8s secret (only secret.example.yaml is committed)
+# Real k8s config/secret -- only the .example.yaml templates are committed.
+# configmap.yaml holds real internal IPs (Proxmox host, LAN gateway);
+# secret.yaml holds real credentials. Neither belongs in a public repo.
 deploy/k8s/secret.yaml
+deploy/k8s/configmap.yaml
