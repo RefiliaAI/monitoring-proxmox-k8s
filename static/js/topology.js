@@ -15,7 +15,7 @@ const TOPO_LAYER_BY_TYPE = {
 // Layout tuning: each layer wraps its nodes into multiple rows instead of
 // squeezing them all onto one line, so the diagram stays legible as more
 // k3s microservices are added instead of growing overlapping labels.
-const TOPO_CANVAS_WIDTH = 960;
+const TOPO_CANVAS_WIDTH = 1400;
 const TOPO_SLOT_WIDTH = 168;
 const TOPO_ROW_HEIGHT = 96;
 const TOPO_LAYER_GAP = 40;
