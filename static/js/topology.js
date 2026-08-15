@@ -1,7 +1,10 @@
+// Negative layers sit above the gateway, positive below -- keeps a clear
+// "clients above, server stack below" read: LAN devices are consumers of
+// the network, everything else is infrastructure the router hosts.
 const TOPO_LAYER_BY_TYPE = {
+  client: -1,
   gateway: 0,
   proxmox_host: 1,
-  client: 1,
   vm: 2,
   k8s_node: 3,
   k8s_pod: 4,
