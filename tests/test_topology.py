@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from app.clients.kubernetes import _derive_display_name
-from app.clients.proxmox import pick_lan_ip
+from app.clients.proxmox import pick_lan_ip, pick_primary_filesystem
 from app.services.topology import build_topology
 
 
@@ -28,6 +28,46 @@ def test_pick_lan_ip_prefers_reference_subnet():
 
 def test_pick_lan_ip_no_interfaces_returns_empty():
     assert pick_lan_ip([]) == []
+
+
+# Real fsinfo payload from a Debian VM's guest agent: EFI boot partition
+# plus the real root filesystem.
+DEBIAN_FSINFO = [
+    {"mountpoint": "/boot/efi", "name": "sda15", "total-bytes": 129718272, "used-bytes": 9322496, "type": "vfat"},
+    {"mountpoint": "/", "name": "sda1", "total-bytes": 40298418176, "used-bytes": 25634947072, "type": "ext4"},
+]
+
+# Real fsinfo payload from a Windows 11 VM's guest agent: two mounted
+# virtio-win/CD-ROM drives (CDFS), a UDF-mounted ISO, two "System
+# Reserved" partitions with no size fields at all, and the real C: drive.
+WINDOWS_FSINFO = [
+    {"mountpoint": "F:\\", "name": "vol-f", "total-bytes": 789645312, "used-bytes": 789645312, "type": "CDFS"},
+    {"mountpoint": "E:\\", "name": "vol-e", "total-bytes": 382976, "used-bytes": 382976, "type": "CDFS"},
+    {"mountpoint": "D:\\", "name": "vol-d", "total-bytes": 8471603200, "used-bytes": 8471603200, "type": "UDF"},
+    {"mountpoint": "System Reserved", "name": "vol-sr1", "type": "FAT32"},
+    {"mountpoint": "System Reserved", "name": "vol-sr2", "type": "NTFS"},
+    {"mountpoint": "C:\\", "name": "vol-c", "total-bytes": 106352865280, "used-bytes": 32028889088, "type": "NTFS"},
+]
+
+
+def test_pick_primary_filesystem_debian_picks_root_not_efi():
+    used, total = pick_primary_filesystem(DEBIAN_FSINFO)
+    assert (used, total) == (25634947072, 40298418176)
+
+
+def test_pick_primary_filesystem_windows_picks_c_drive_not_cdrom_or_iso():
+    used, total = pick_primary_filesystem(WINDOWS_FSINFO)
+    assert (used, total) == (32028889088, 106352865280)
+
+
+def test_pick_primary_filesystem_empty_returns_none():
+    assert pick_primary_filesystem([]) == (None, None)
+
+
+def test_pick_primary_filesystem_only_optical_media_returns_none():
+    assert pick_primary_filesystem(
+        [{"mountpoint": "D:\\", "total-bytes": 100, "used-bytes": 100, "type": "UDF"}]
+    ) == (None, None)
 
 
 def test_build_topology_basic_graph():

@@ -60,6 +60,24 @@ function renderOverview(server) {
   memCard.appendChild(memStats);
   hero.appendChild(memCard);
 
+  if (server.disk_total_bytes != null) {
+    const diskCard = document.createElement("div");
+    diskCard.className = "card hero-card";
+    diskCard.appendChild(
+      renderMeter({
+        label: `Disk usage (${server.disk_pool_name})`,
+        pct: server.disk_used_percent,
+        valueText: `${server.disk_used_percent.toFixed(1)}%`,
+      })
+    );
+    const diskStats = document.createElement("div");
+    diskStats.className = "hero-stat-row";
+    diskStats.appendChild(renderStatTile(formatBytes(server.disk_used_bytes), "Used"));
+    diskStats.appendChild(renderStatTile(formatBytes(server.disk_total_bytes), "Total"));
+    diskCard.appendChild(diskStats);
+    hero.appendChild(diskCard);
+  }
+
   if (server.stale) {
     const warn = document.createElement("div");
     warn.className = "empty-state";
@@ -105,6 +123,19 @@ function renderVMs(vms) {
         valueText: `${formatBytes(vm.mem_used_bytes)} / ${formatBytes(vm.mem_total_bytes)}`,
       })
     );
+
+    if (vm.disk_total_bytes != null) {
+      const diskPct = (vm.disk_used_bytes / vm.disk_total_bytes) * 100;
+      card.appendChild(
+        renderMeter({
+          label: "Disk",
+          pct: diskPct,
+          valueText: `${formatBytes(vm.disk_used_bytes)} / ${formatBytes(vm.disk_total_bytes)}`,
+        })
+      );
+    } else {
+      card.appendChild(renderMeter({ label: "Disk", pct: null, valueText: "No agent data" }));
+    }
 
     const metaRow = document.createElement("div");
     metaRow.className = "entity-meta-row";
@@ -174,7 +205,44 @@ function renderPods(pods) {
     const metaRow = document.createElement("div");
     metaRow.className = "entity-meta-row";
     metaRow.innerHTML = pod.pod_ip ? `<code>${pod.pod_ip}</code>` : "<span>No pod IP</span>";
+    if (pod.pvc_name) {
+      const capacity = pod.pvc_capacity_bytes != null ? formatBytes(pod.pvc_capacity_bytes) : "?";
+      metaRow.innerHTML += `<span>&#128190; ${capacity} (${pod.pvc_storage_class || "unknown class"})</span>`;
+    }
     card.appendChild(metaRow);
+
+    grid.appendChild(card);
+  }
+}
+
+function renderStorage(pools) {
+  const grid = document.getElementById("storage-grid");
+  grid.innerHTML = "";
+  if (!pools.length) {
+    grid.innerHTML = '<div class="empty-state">No storage pools reported yet.</div>';
+    return;
+  }
+  for (const pool of pools) {
+    const card = document.createElement("div");
+    card.className = "card entity-card";
+
+    const head = document.createElement("div");
+    head.className = "entity-head";
+    head.innerHTML = `
+      <div>
+        <div class="entity-name">${pool.name}</div>
+        <div class="entity-sub">${pool.type} · ${pool.content}</div>
+      </div>
+    `;
+    card.appendChild(head);
+
+    card.appendChild(
+      renderMeter({
+        label: "Used",
+        pct: pool.used_percent,
+        valueText: `${formatBytes(pool.used_bytes)} / ${formatBytes(pool.total_bytes)}`,
+      })
+    );
 
     grid.appendChild(card);
   }
@@ -302,6 +370,10 @@ async function bootstrap() {
       async () => {
         const pods = await fetchJSON("/api/pods");
         renderPods(pods);
+      },
+      async () => {
+        const storagePools = await fetchJSON("/api/storage");
+        renderStorage(storagePools);
       },
       refreshClients,
       async () => {

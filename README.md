@@ -4,9 +4,10 @@ A cute pastel pink-and-white monitoring dashboard for a Proxmox VE host and its 
 cluster. Runs as its own microservice inside k3s, reachable only on the LAN.
 
 Shows:
-- Overall physical server CPU/RAM totals vs. current utilization.
-- Per-VM CPU/RAM (with LAN IPs, via the QEMU guest agent).
-- Per-microservice (k3s pod) CPU/RAM.
+- Overall physical server CPU/RAM/disk totals vs. current utilization.
+- Per-VM CPU/RAM/disk (with LAN IPs, via the QEMU guest agent).
+- Per-microservice (k3s pod) CPU/RAM, plus its PVC size/storage class if it has one.
+- Every Proxmox storage pool (local, local-lvm/local-zfs, ...) individually.
 - Every other device on the LAN (phones, laptops, IoT, ...), if a FRITZ!Box router is
   configured -- name, IP, MAC, online/offline.
 - An auto-discovered network plan: gateway → Proxmox host → VMs → k3s node →

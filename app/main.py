@@ -9,7 +9,7 @@ from app.clients.fritzbox import FritzBoxClient
 from app.clients.kubernetes import K8sClient
 from app.clients.proxmox import ProxmoxClient
 from app.config import settings
-from app.routers import clients, health, meta, pods, server, topology, vms
+from app.routers import clients, health, meta, pods, server, storage, topology, vms
 from app.services.poller import poller_loop
 
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +58,7 @@ app.include_router(server.router)
 app.include_router(vms.router)
 app.include_router(pods.router)
 app.include_router(clients.router)
+app.include_router(storage.router)
 app.include_router(topology.router)
 app.include_router(meta.router)
 

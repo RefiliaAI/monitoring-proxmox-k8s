@@ -110,6 +110,11 @@ class K8sClient:
                         limits.update(c.resources.limits)
                     if c.resources.requests:
                         requests.update(c.resources.requests)
+            pvc_claim_name = None
+            for v in p.spec.volumes or []:
+                if v.persistent_volume_claim:
+                    pvc_claim_name = v.persistent_volume_claim.claim_name
+                    break
             result.append(
                 {
                     "namespace": p.metadata.namespace,
@@ -127,6 +132,7 @@ class K8sClient:
                     "mem_limit_bytes": (
                         _parse_mem_to_bytes(limits["memory"]) if limits.get("memory") else None
                     ),
+                    "pvc_claim_name": pvc_claim_name,
                 }
             )
         # The list API doesn't guarantee stable ordering between calls;
@@ -149,6 +155,17 @@ class K8sClient:
         # The list API doesn't guarantee stable ordering between calls;
         # sort so the UI doesn't reshuffle entities on every poll.
         result.sort(key=lambda item: (item["namespace"], item["name"]))
+        return result
+
+    def list_pvcs(self) -> dict[tuple[str, str], dict]:
+        pvcs = self.core.list_persistent_volume_claim_for_all_namespaces()
+        result = {}
+        for p in pvcs.items:
+            capacity = (p.status.capacity or {}).get("storage")
+            result[(p.metadata.namespace, p.metadata.name)] = {
+                "capacity_bytes": _parse_mem_to_bytes(capacity) if capacity else None,
+                "storage_class": p.spec.storage_class_name,
+            }
         return result
 
     def get_node_metrics(self) -> dict[str, dict]:

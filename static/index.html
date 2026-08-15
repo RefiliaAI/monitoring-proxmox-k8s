@@ -26,6 +26,7 @@
       <button class="tab" role="tab" aria-selected="true" data-view="overview">Overview</button>
       <button class="tab" role="tab" aria-selected="false" data-view="vms">Virtual Machines</button>
       <button class="tab" role="tab" aria-selected="false" data-view="pods">Microservices</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="storage">Storage</button>
       <button class="tab" role="tab" aria-selected="false" data-view="clients">LAN Devices</button>
       <button class="tab" role="tab" aria-selected="false" data-view="topology">Network Plan</button>
     </nav>
@@ -48,6 +49,18 @@
       <section id="view-pods" class="view" data-view="pods" hidden>
         <h2 class="view-title">Microservices (k3s pods)</h2>
         <div class="card-grid" id="pod-grid">
+          <div class="empty-state">Waiting for the first reading&hellip;</div>
+        </div>
+      </section>
+
+      <section id="view-storage" class="view" data-view="storage" hidden>
+        <h2 class="view-title">Storage pools</h2>
+        <p class="view-hint">
+          Each pool's own numbers are accurate, but pools can share the same underlying
+          physical disk (e.g. a ZFS pool and a directory storage on top of it) -- don't
+          add them together.
+        </p>
+        <div class="card-grid" id="storage-grid">
           <div class="empty-state">Waiting for the first reading&hellip;</div>
         </div>
       </section>
