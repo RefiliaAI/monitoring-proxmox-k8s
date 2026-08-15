@@ -7,8 +7,9 @@ const TOPO_LAYER_BY_TYPE = {
   proxmox_host: 1,
   vm: 2,
   k8s_node: 3,
-  k8s_pod: 4,
-  k8s_service: 5,
+  namespace: 4,
+  k8s_pod: 5,
+  k8s_service: 6,
 };
 
 // Layout tuning: each layer wraps its nodes into multiple rows instead of
@@ -33,6 +34,10 @@ const TOPO_TYPE_META = {
   client: { label: "LAN device", colorVar: "--cat-client", icon: "\u{1F4F1}" },
   vm: { label: "Virtual machine", colorVar: "--cat-vm", icon: "\u{1F4BB}" },
   k8s_node: { label: "k3s node", colorVar: "--cat-k8s-node", icon: "☸" },
+  // Muted/neutral rather than a bright categorical hue on purpose --
+  // a namespace is a structural grouping, not a peer entity next to a
+  // VM or pod, so it shouldn't visually compete with the real ones.
+  namespace: { label: "Namespace", colorVar: "--text-muted", icon: "\u{1F4C1}" },
   k8s_pod: { label: "Microservice (pod)", colorVar: "--cat-k8s-pod", icon: "\u{1F4E6}" },
   k8s_service: { label: "k8s service", colorVar: "--cat-k8s-service", icon: "\u{1F517}" },
 };

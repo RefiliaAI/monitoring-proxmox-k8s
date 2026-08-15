@@ -123,12 +123,30 @@ def build_topology(
             )
         )
 
+    # One namespace node per distinct namespace, sitting between the k8s
+    # Node and its pods, so a busy cluster fans out node -> namespace ->
+    # pods instead of node -> every pod directly -- the direct fan-out is
+    # what made the diagram an unreadable tangle of crossing lines once
+    # more than a couple of namespaces were being watched.
+    namespace_ids: dict[str, str] = {}
+    node_to_namespace_edges: set[tuple[str, str]] = set()
+
     pod_node_id_by_key: dict[tuple[str, str], str] = {}
     for pod in pods:
         key = (pod["namespace"], pod["name"])
         pod_node_id = f"pod-{pod['namespace']}-{pod['name']}"
         pod_node_id_by_key[key] = pod_node_id
         status = "ok" if pod.get("status") == "Running" else "warn"
+
+        namespace = pod["namespace"]
+        ns_node_id = namespace_ids.get(namespace)
+        if ns_node_id is None:
+            ns_node_id = f"ns-{namespace}"
+            namespace_ids[namespace] = ns_node_id
+            # Namespaces are an organizational grouping, not a health-
+            # bearing entity -- no meaningful status to report.
+            nodes.append(TopologyNode(id=ns_node_id, type="namespace", label=namespace, status="unknown"))
+
         nodes.append(
             TopologyNode(
                 id=pod_node_id,
@@ -136,15 +154,20 @@ def build_topology(
                 label=pod.get("display_name", pod["name"]),
                 ip=pod.get("pod_ip"),
                 status=status,
-                meta={"namespace": pod["namespace"], "full_name": pod["name"]},
+                meta={"namespace": namespace, "full_name": pod["name"]},
             )
         )
+        edges.append(TopologyEdge(source=ns_node_id, target=pod_node_id, type="runs_on"))
+
         node_name = pod.get("node")
         parent_k8s_node_id = f"k8s-node-{node_name}" if node_name else None
         if parent_k8s_node_id and any(n.id == parent_k8s_node_id for n in nodes):
-            edges.append(
-                TopologyEdge(source=parent_k8s_node_id, target=pod_node_id, type="runs_on")
-            )
+            edge_key = (parent_k8s_node_id, ns_node_id)
+            if edge_key not in node_to_namespace_edges:
+                node_to_namespace_edges.add(edge_key)
+                edges.append(
+                    TopologyEdge(source=parent_k8s_node_id, target=ns_node_id, type="runs_on")
+                )
 
     for svc in services:
         selector = svc.get("selector") or {}

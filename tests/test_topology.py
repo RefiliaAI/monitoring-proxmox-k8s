@@ -121,6 +121,41 @@ def test_build_topology_basic_graph():
     assert any(e.source == "svc-default-myapp" and e.target == "pod-default-myapp-abc123" for e in expose_edges)
 
 
+def test_build_topology_pods_hang_off_a_namespace_node_not_the_k8s_node_directly():
+    k8s_nodes = [{"name": "debian-k3s", "internal_ip": None}]
+    pods = [
+        {"namespace": "default", "name": "app-a", "labels": {}, "node": "debian-k3s", "pod_ip": "10.42.0.1", "status": "Running"},
+        {"namespace": "default", "name": "app-b", "labels": {}, "node": "debian-k3s", "pod_ip": "10.42.0.2", "status": "Running"},
+        {"namespace": "kube-tools", "name": "tool-a", "labels": {}, "node": "debian-k3s", "pod_ip": "10.42.0.3", "status": "Running"},
+    ]
+
+    topo = build_topology(
+        gateway_ip="192.168.1.1",
+        gateway_label="Home Router",
+        proxmox_host_label="pve",
+        proxmox_host_ip=None,
+        vms=[],
+        k8s_nodes=k8s_nodes,
+        pods=pods,
+        services=[],
+    )
+
+    namespace_nodes = {n.id: n for n in topo.nodes if n.type == "namespace"}
+    assert set(namespace_nodes) == {"ns-default", "ns-kube-tools"}
+
+    # No pod is a direct target of an edge sourced from the k8s node --
+    # everything routes through its namespace node instead.
+    assert not any(
+        e.source == "k8s-node-debian-k3s" and e.target.startswith("pod-") for e in topo.edges
+    )
+    # Exactly one k8s-node -> namespace edge per namespace (not one per pod).
+    node_to_ns_edges = [e for e in topo.edges if e.source == "k8s-node-debian-k3s" and e.target in namespace_nodes]
+    assert len(node_to_ns_edges) == 2
+    # Both of default's pods hang off the same namespace node.
+    default_pod_edges = {e.target for e in topo.edges if e.source == "ns-default"}
+    assert default_pod_edges == {"pod-default-app-a", "pod-default-app-b"}
+
+
 def test_derive_display_name_strips_replicaset_hash():
     owner = [SimpleNamespace(kind="ReplicaSet", name="e2e-extended-74d6c86cbb")]
     assert _derive_display_name("e2e-extended-74d6c86cbb-f6q68", owner) == "e2e-extended"

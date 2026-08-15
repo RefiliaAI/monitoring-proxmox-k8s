@@ -86,7 +86,14 @@ class ClientDevice(BaseModel):
 class TopologyNode(BaseModel):
     id: str
     type: Literal[
-        "gateway", "proxmox_host", "vm", "k8s_node", "k8s_pod", "k8s_service", "client"
+        "gateway",
+        "proxmox_host",
+        "vm",
+        "k8s_node",
+        "namespace",
+        "k8s_pod",
+        "k8s_service",
+        "client",
     ]
     label: str
     ip: str | None = None
