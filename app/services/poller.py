@@ -107,16 +107,16 @@ async def _poll_kubernetes(
     k8s: K8sClient,
 ) -> tuple[list[PodStat], list[dict], list[dict], list[dict]]:
     now = _now()
-    namespaces = settings.watched_namespaces_list
+    excluded_namespaces = settings.excluded_namespaces_list
     k8s_nodes: list[dict] = []
     raw_pods: list[dict] = []
     services: list[dict] = []
     pod_stats: list[PodStat] = []
     try:
         k8s_nodes = k8s.list_nodes()
-        raw_pods = k8s.list_pods(namespaces)
+        raw_pods = k8s.list_pods(excluded_namespaces)
         services = k8s.list_services()
-        pod_metrics = k8s.get_pod_metrics(namespaces)
+        pod_metrics = k8s.get_pod_metrics()
         pvcs = k8s.list_pvcs()
         for pod in raw_pods:
             key = (pod["namespace"], pod["name"])

@@ -96,11 +96,11 @@ class K8sClient:
         result.sort(key=lambda item: item["name"])
         return result
 
-    def list_pods(self, namespaces: list[str]) -> list[dict]:
+    def list_pods(self, excluded_namespaces: list[str]) -> list[dict]:
         pods = self.core.list_pod_for_all_namespaces()
         result = []
         for p in pods.items:
-            if p.metadata.namespace not in namespaces:
+            if p.metadata.namespace in excluded_namespaces:
                 continue
             limits = {}
             requests = {}
@@ -184,23 +184,26 @@ class K8sClient:
             }
         return result
 
-    def get_pod_metrics(self, namespaces: list[str]) -> dict[tuple[str, str], dict]:
+    def get_pod_metrics(self) -> dict[tuple[str, str], dict]:
+        """Cluster-wide, like get_node_metrics -- metrics.k8s.io exposes
+        pod metrics across every namespace in one call (the same thing
+        `kubectl top pods -A` uses), so there's no need to loop per
+        namespace or know the namespace list in advance.
+        """
         result: dict[tuple[str, str], dict] = {}
-        for ns in namespaces:
-            try:
-                data = self.custom.list_namespaced_custom_object(
-                    "metrics.k8s.io", "v1beta1", ns, "pods"
-                )
-            except ApiException as exc:
-                logger.warning("metrics-server pod metrics unavailable for ns=%s: %s", ns, exc)
-                continue
-            for item in data.get("items", []):
-                name = item["metadata"]["name"]
-                cpu_total = 0
-                mem_total = 0
-                for c in item.get("containers", []):
-                    usage = c.get("usage", {})
-                    cpu_total += _parse_cpu_to_millicores(usage.get("cpu", "0"))
-                    mem_total += _parse_mem_to_bytes(usage.get("memory", "0"))
-                result[(ns, name)] = {"cpu_millicores": cpu_total, "mem_bytes": mem_total}
+        try:
+            data = self.custom.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods")
+        except ApiException as exc:
+            logger.warning("metrics-server pod metrics unavailable: %s", exc)
+            return result
+        for item in data.get("items", []):
+            namespace = item["metadata"]["namespace"]
+            name = item["metadata"]["name"]
+            cpu_total = 0
+            mem_total = 0
+            for c in item.get("containers", []):
+                usage = c.get("usage", {})
+                cpu_total += _parse_cpu_to_millicores(usage.get("cpu", "0"))
+                mem_total += _parse_mem_to_bytes(usage.get("memory", "0"))
+            result[(namespace, name)] = {"cpu_millicores": cpu_total, "mem_bytes": mem_total}
         return result

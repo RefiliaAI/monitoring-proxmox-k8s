@@ -11,9 +11,12 @@ class Settings(BaseSettings):
     proxmox_token_secret: str
     proxmox_verify_ssl: bool = False
 
-    # Kubernetes
+    # Kubernetes -- every namespace is watched by default (so new ones
+    # show up automatically with no config change) except these, which
+    # are Kubernetes/k3s's own system namespaces rather than anything a
+    # user deploys.
     k8s_in_cluster: bool = True
-    watched_namespaces: str = "default"
+    excluded_namespaces: str = "kube-system,kube-public,kube-node-lease"
 
     # Topology seed node (not discoverable via any API)
     lan_gateway_ip: str
@@ -39,8 +42,8 @@ class Settings(BaseSettings):
     port: int = 8080
 
     @property
-    def watched_namespaces_list(self) -> list[str]:
-        return [ns.strip() for ns in self.watched_namespaces.split(",") if ns.strip()]
+    def excluded_namespaces_list(self) -> list[str]:
+        return [ns.strip() for ns in self.excluded_namespaces.split(",") if ns.strip()]
 
 
 settings = Settings()
