@@ -1,7 +1,12 @@
 from types import SimpleNamespace
 
 from app.clients.kubernetes import _derive_display_name
-from app.clients.proxmox import pick_lan_ip, pick_primary_filesystem
+from app.clients.proxmox import (
+    parse_linux_meminfo_used_bytes,
+    parse_windows_meminfo_used_bytes,
+    pick_lan_ip,
+    pick_primary_filesystem,
+)
 from app.services.topology import build_topology
 
 
@@ -68,6 +73,51 @@ def test_pick_primary_filesystem_only_optical_media_returns_none():
     assert pick_primary_filesystem(
         [{"mountpoint": "D:\\", "total-bytes": 100, "used-bytes": 100, "type": "UDF"}]
     ) == (None, None)
+
+
+# Real `cat /proc/meminfo` output from the Debian k3s VM, captured via
+# guest-exec while investigating why Proxmox's own reported "used" (42GB)
+# didn't match what `free` inside the guest said (24GB): the gap is
+# reclaimable disk cache/buffers that MemAvailable already accounts for
+# and MemFree doesn't.
+REAL_LINUX_MEMINFO = """MemTotal:       49340092 kB
+MemFree:         4990300 kB
+MemAvailable:   23676524 kB
+Buffers:          268928 kB
+Cached:         18243816 kB
+SwapCached:            0 kB
+Active:         25799500 kB
+Inactive:       17450872 kB
+"""
+
+REAL_WINDOWS_WMI_JSON = """{
+    "TotalVisibleMemorySize":  16708008,
+    "FreePhysicalMemory":  14657992
+}
+"""
+
+
+def test_parse_linux_meminfo_uses_available_not_free():
+    used = parse_linux_meminfo_used_bytes(REAL_LINUX_MEMINFO)
+    assert used == (49340092 - 23676524) * 1024
+    # Sanity: must NOT be the MemTotal-MemFree figure Proxmox's balloon
+    # driver reports, which is what made this look ~2x too high.
+    assert used != (49340092 - 4990300) * 1024
+
+
+def test_parse_linux_meminfo_missing_fields_returns_none():
+    assert parse_linux_meminfo_used_bytes("SomeOtherField: 123 kB\n") is None
+    assert parse_linux_meminfo_used_bytes("") is None
+
+
+def test_parse_windows_meminfo():
+    used = parse_windows_meminfo_used_bytes(REAL_WINDOWS_WMI_JSON)
+    assert used == (16708008 - 14657992) * 1024
+
+
+def test_parse_windows_meminfo_malformed_returns_none():
+    assert parse_windows_meminfo_used_bytes("not json") is None
+    assert parse_windows_meminfo_used_bytes('{"TotalVisibleMemorySize": 100}') is None
 
 
 def test_build_topology_basic_graph():

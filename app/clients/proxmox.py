@@ -1,5 +1,9 @@
+import asyncio
 import ipaddress
+import json
 import logging
+import re
+import time
 
 import httpx
 
@@ -82,6 +86,42 @@ def pick_primary_filesystem(fsinfo_result: list[dict]) -> tuple[int | None, int 
     return primary["used-bytes"], primary["total-bytes"]
 
 
+_MEMINFO_LINE_RE = re.compile(r"^(\w+):\s+(\d+) kB", re.MULTILINE)
+
+
+def parse_linux_meminfo_used_bytes(meminfo_text: str) -> int | None:
+    """Computes real used memory from a Linux `/proc/meminfo` dump, the
+    same way `free`'s "used" column does: MemTotal - MemAvailable, not
+    MemTotal - MemFree. MemFree alone is misleadingly low because Linux
+    opportunistically fills spare RAM with reclaimable disk cache/buffers
+    that isn't real memory pressure -- MemAvailable already accounts for
+    that reclaim, so the resulting "used" tracks what's actually pinned
+    by applications. This is also what Proxmox's own balloon-based `mem`
+    stat gets wrong: the balloon driver only exposes total/free, not the
+    cache/buffers split, so it counts all of that reclaimable cache as
+    "used" too.
+    """
+    values = {m.group(1): int(m.group(2)) for m in _MEMINFO_LINE_RE.finditer(meminfo_text)}
+    total_kb = values.get("MemTotal")
+    available_kb = values.get("MemAvailable")
+    if total_kb is None or available_kb is None:
+        return None
+    return (total_kb - available_kb) * 1024
+
+
+def parse_windows_meminfo_used_bytes(wmi_json_text: str) -> int | None:
+    """Computes used memory from a Win32_OperatingSystem WMI query's JSON
+    output (TotalVisibleMemorySize/FreePhysicalMemory, both in KB).
+    """
+    try:
+        data = json.loads(wmi_json_text)
+        total_kb = data["TotalVisibleMemorySize"]
+        free_kb = data["FreePhysicalMemory"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return None
+    return (total_kb - free_kb) * 1024
+
+
 class ProxmoxClient:
     def __init__(self, host: str, node: str, token_id: str, token_secret: str, verify_ssl: bool = False):
         self.node = node
@@ -93,6 +133,9 @@ class ProxmoxClient:
             verify=verify_ssl,
             timeout=10.0,
         )
+        # Guest OS rarely/never changes for a running VM's lifetime, so
+        # cache it instead of paying a guest-agent round trip every poll.
+        self._os_id_cache: dict[int, str] = {}
 
     async def aclose(self):
         await self._client.aclose()
@@ -149,6 +192,83 @@ class ProxmoxClient:
             return None, None
         return pick_primary_filesystem(fsinfo)
 
+    async def get_guest_os_id(self, vmid: int) -> str | None:
+        """Returns the guest-agent-reported OS id (e.g. "debian",
+        "mswindows"), cached per VM since it doesn't change at runtime.
+        """
+        cached = self._os_id_cache.get(vmid)
+        if cached:
+            return cached
+        try:
+            resp = await self._client.get(f"/nodes/{self.node}/qemu/{vmid}/agent/get-osinfo")
+            resp.raise_for_status()
+            os_id = resp.json()["data"]["result"]["id"]
+        except (httpx.HTTPStatusError, httpx.RequestError, KeyError, TypeError):
+            return None
+        self._os_id_cache[vmid] = os_id
+        return os_id
+
+    async def exec_guest_command(
+        self, vmid: int, command: list[str], timeout: float = 5.0
+    ) -> str | None:
+        """Runs `command` inside the VM via the guest agent and returns
+        its stdout, or None if the agent's unreachable, the command
+        fails, or it doesn't finish within `timeout` seconds. QEMU
+        guest-exec is async (start, then poll for completion), unlike
+        every other guest-agent call this client makes.
+        """
+        try:
+            resp = await self._client.post(
+                f"/nodes/{self.node}/qemu/{vmid}/agent/exec",
+                json={"command": command},
+            )
+            resp.raise_for_status()
+            pid = resp.json()["data"]["pid"]
+        except (httpx.HTTPStatusError, httpx.RequestError, KeyError, TypeError):
+            return None
+
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                resp = await self._client.get(
+                    f"/nodes/{self.node}/qemu/{vmid}/agent/exec-status",
+                    params={"pid": pid},
+                )
+                resp.raise_for_status()
+                status = resp.json()["data"]
+            except (httpx.HTTPStatusError, httpx.RequestError, KeyError, TypeError):
+                return None
+            if status.get("exited"):
+                return status.get("out-data") if status.get("exitcode") == 0 else None
+            if time.monotonic() >= deadline:
+                return None
+            await asyncio.sleep(0.2)
+
+    async def get_vm_real_memory_used(self, vmid: int) -> int | None:
+        """Real "in use" memory from inside the guest (excludes
+        reclaimable disk cache/buffers, unlike Proxmox's own balloon-
+        reported `mem` stat -- see parse_linux_meminfo_used_bytes).
+        Returns None on any failure so the caller can fall back to the
+        Proxmox-reported figure.
+        """
+        os_id = await self.get_guest_os_id(vmid)
+        if os_id is None:
+            return None
+        if os_id == "mswindows":
+            output = await self.exec_guest_command(
+                vmid,
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-Command",
+                    "Get-CimInstance Win32_OperatingSystem | "
+                    "Select-Object TotalVisibleMemorySize,FreePhysicalMemory | ConvertTo-Json",
+                ],
+            )
+            return parse_windows_meminfo_used_bytes(output) if output else None
+        output = await self.exec_guest_command(vmid, ["cat", "/proc/meminfo"])
+        return parse_linux_meminfo_used_bytes(output) if output else None
+
     async def fetch_all_vm_stats(self) -> list[dict]:
         # The list API doesn't guarantee stable ordering between calls;
         # sort so the UI doesn't reshuffle entities on every poll.
@@ -164,9 +284,14 @@ class ProxmoxClient:
                     status = vm
                 ip_addresses, agent_reachable = await self.get_vm_ip_addresses(vmid)
                 disk_used_bytes, disk_total_bytes = await self.get_vm_disk_usage(vmid)
+                # Prefer the guest's own real-usage figure (excludes
+                # reclaimable cache/buffers); fall back to Proxmox's
+                # balloon-reported value if the guest-exec path fails.
+                real_mem_used = await self.get_vm_real_memory_used(vmid)
             else:
                 ip_addresses, agent_reachable = [], False
                 disk_used_bytes, disk_total_bytes = None, None
+                real_mem_used = None
             results.append(
                 {
                     "vmid": vmid,
@@ -174,7 +299,7 @@ class ProxmoxClient:
                     "status": vm.get("status", "unknown"),
                     "cpu": status.get("cpu", 0.0),
                     "maxmem": status.get("maxmem", 0),
-                    "mem": status.get("mem", 0),
+                    "mem": real_mem_used if real_mem_used is not None else status.get("mem", 0),
                     "ip_addresses": ip_addresses,
                     "agent_reachable": agent_reachable,
                     "disk_used_bytes": disk_used_bytes,
